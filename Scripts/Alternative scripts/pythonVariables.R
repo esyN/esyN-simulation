@@ -1,3 +1,21 @@
+###Copyright 2014 Lorenzo Ficorella
+###  
+###This file is part of “Petri Net Simulator”.
+###
+###“Petri Net Simulator” is free software: you can redistribute it and/or modify
+###it under the terms of the GNU Lesser General Public License as published by
+###the Free Software Foundation, either version 3 of the License, or
+###(at your option) any later version.
+###
+###“Petri Net Simulator” is distributed in the hope that it will be useful,
+###but WITHOUT ANY WARRANTY; without even the implied warranty of
+###MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+###GNU Lesser General Public License for more details.
+###
+###You should have received a copy of the GNU Lesser General Public License
+###along with “Petri Net Simulator”.  If not, see <http://www.gnu.org/licenses/>.
+
+
 {
 #this script uses the tables produced by the python script and convert them into matrices and vectors; more in detail:
 #Snoopy -- export network as --> 	MatLab file --converted by a Python script in --> 	txt tables -- read and converted by this script into -->	matrices

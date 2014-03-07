@@ -1,3 +1,20 @@
+###Copyright 2014 Daniel Bean
+###  
+###This file is part of “Petri Net Simulator”.
+###
+###“Petri Net Simulator” is free software: you can redistribute it and/or modify
+###it under the terms of the GNU Lesser General Public License as published by
+###the Free Software Foundation, either version 3 of the License, or
+###(at your option) any later version.
+###
+###“Petri Net Simulator” is distributed in the hope that it will be useful,
+###but WITHOUT ANY WARRANTY; without even the implied warranty of
+###MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+###GNU Lesser General Public License for more details.
+###
+###You should have received a copy of the GNU Lesser General Public License
+###along with “Petri Net Simulator”.  If not, see <http://www.gnu.org/licenses/>.
+
 {
 #this script uses the json file (e.g. output from cytoscape or downloaded from the website) in order to obtain the matrices and vectors we need
 #install.packages('rjson')	#install the package 'rjson', disabled; you need to enable it only the first time, and only if you haven't used this package already 
