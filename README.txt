@@ -19,10 +19,11 @@ Welcome to the PetriNet Simulator.
 This scripts allow you to simulate the behaviour of your Petri Network.
 
 Input format	= json file (merge_matrices.txt) obtained from the website "http://www.esyn.org"
-		  that file must be placed in the "Matrices" folder
-
+		  that file must be placed in the same folder of the Simulator
 How to run	= just start Simulator.R
-		  values are printed out in the R interface
+		  values are printed out in the R interface and in the "finalmarkings.txt" file
 
 Licenses	= in the "Licenses" folder you may find:
-		  1) a copy of the "GNU General Public License" 2) a copy of the "GNU Lesser General Public License"
+		  
+		1) a copy of the "GNU General Public License"
+		2) a copy of the "GNU Lesser General Public License"
