@@ -14,17 +14,16 @@
 ### along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-
 ####################################
 ### HERE STARTS THE DECLARATION PART
 ####################################
-#It gives the starting markings, the name of the places/transitions and the arc (inward, outward, inhibitory) weights to be used in the script. It uses a json file as input, but you can re-write this part to use other kinds of input 0
 
 #you can change the path of the input/output files by writing it in the variable "path"
 path	  = "."
 input_file  = paste (path, "/merge_matrices.txt", sep = "")
 output_file = paste (path, "/finalmarkings.txt", sep = "")
 
+#It gives the starting markings, the name of the places/transitions and the arc (inward, outward, inhibitory) weights to be used in the script. It uses a json file as input, but you can re-write this part to use other kinds of input 0
 
 if(!("rjson" %in% rownames(installed.packages()))) {install.packages("rjson")}	#install the package 'rjson'; it'll run it only the first time, and only if you haven't used this package yet
 library('rjson')												#every script must load the library
@@ -81,9 +80,9 @@ if (choice ==1)
 
 
 Globtable			= matrix(ncol= NP, nrow= 0)
-colnames(Globtable)	=  PLnames
 #Table to summarize the results of all runs and the mean value of the runs (for each place)
-	
+
+Deadstate = rep (FALSE, Iter)
 ####################################
 ### HERE ENDS THE DECLARATION PART
 ####################################
@@ -109,8 +108,8 @@ Simulcore = function()
 				if 	(length(vector1) == 0)	
 					{			# if you pick all transitions and they are all disabled, you've surely reached a dead state; therefore the whole simulation stops
 	 				.Internal(cat(list("you reached a dead state!! \n"), stdout(), " ", FALSE, NULL, FALSE))
-	 				MM[] = -1	# an absurd value (negative marking) is returned as a mark that something has gone wrong!
-	 				return(MM[])
+					Deadstate[y] = TRUE
+		 			return(MM[])
 					}
   				}
 			}
@@ -138,9 +137,11 @@ if (Iter > 1)
 	}
 if	(Optim != "")
 	{cat ("\n therefore, the (mean) value of ", Optname, " is ", Globtable[nrow(Globtable), Optim], "for each iteration")}
-	
-#print the summary table and the mean value of the selected place
-write.table (Globtable, output_file, quote = FALSE, row.names=FALSE, sep = "\t")
+
+
+Globtable = cbind(Globtable, c(Deadstate,""))
+colnames(Globtable) = c(PLnames, "Dead State?")
+write.table (Globtable, output_file, quote = FALSE, sep = "\t")	#print the summary table and the mean value of the selected place
 cat ("\n\n Success! It has been created a file containing the final values of all the places at the end of each iteration (and the mean values)")
 
 ####################################
