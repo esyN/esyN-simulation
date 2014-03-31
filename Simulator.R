@@ -20,9 +20,15 @@
 ####################################
 #It gives the starting markings, the name of the places/transitions and the arc (inward, outward, inhibitory) weights to be used in the script. It uses a json file as input, but you can re-write this part to use other kinds of input 0
 
+#you can change the path of the input/output files by writing it in the variable "path"
+path	  = "."
+input_file  = paste (path, "/merge_matrices.txt", sep = "")
+output_file = paste (path, "/finalmarkings.txt", sep = "")
+
+
 if(!("rjson" %in% rownames(installed.packages()))) {install.packages("rjson")}	#install the package 'rjson'; it'll run it only the first time, and only if you haven't used this package yet
 library('rjson')												#every script must load the library
-json_data	<- fromJSON(paste(readLines("Matrices/merge_matrices.txt"), collapse=""))
+json_data	<- fromJSON(paste(readLines(input_file), collapse=""))
 
 MM = MARKINGS  	<- json_data$marking 	#tokens in all the places at time 0 (i.e. the tokens you've written in the network)
 TRnames		<- json_data$tnames
@@ -66,7 +72,7 @@ if (choice ==1)
 		{
 		MS	= type.convert(readline ("insert the number of putative transitions: " ), as.is = TRUE)
 			 #The number of transition you want to simulate
-		Iter = type.convert(readline ("insert the number of iterations: " )), as.is = TRUE)
+		Iter = type.convert(readline ("insert the number of iterations: " ), as.is = TRUE)
 			 #The number of times you want to run the script, in order to obtain mean values of the results
 		if 	((is.numeric(MS)) && (is.numeric(Iter)))	{break
 		}else	{cat	("one or more values are not numeric, please retry \n")}
@@ -82,7 +88,35 @@ colnames(Globtable)	=  PLnames
 ### HERE ENDS THE DECLARATION PART
 ####################################
 
-
+Simulcore = function()
+	{     
+	for(x in seq(1,MS,1))		#the core of the simulation; each step is repeated for MS times (x=1 is the starting condition)
+		{		
+		vector1	= 1:TT
+		repeat
+			{
+			rn 		<- vector1[.Internal(sample(length(vector1), 1, replace = FALSE, prob = NULL))]		#pick a random transition
+			index	<-.Internal(which(NINHIBIT[rn,]>=1))	#see whether there are inhibitions arcs involved in that transition (and where they are)
+ 			
+			if	(((length(index) == 0) || (all(MM[index] < NINHIBIT[rn,index]))) && (all(MM >= -NOUT[rn,])))
+  				{				#the real transition is completed, adding tokens to postplaces and removing them from preplaces
+  				MM = MM + DELTA[rn,]
+  			 	break
+  			 	}					
+			else 
+				{				# the picked transition could be disabled because there is inhibition or because the tokens you have are less than those you need;
+				vector1 = vector1[!vector1 == rn]	# if that, you repeat the picking until you pick a good one!
+				if 	(length(vector1) == 0)	
+					{			# if you pick all transitions and they are all disabled, you've surely reached a dead state; therefore the whole simulation stops
+	 				.Internal(cat(list("you reached a dead state!! \n"), stdout(), " ", FALSE, NULL, FALSE))
+	 				MM[] = -1	# an absurd value (negative marking) is returned as a mark that something has gone wrong!
+	 				return(MM[])
+					}
+  				}
+			}
+		}
+	return(MM[])
+	}
 
 ####################################
 ### HERE STARTS THE MAIN PART
@@ -90,36 +124,7 @@ colnames(Globtable)	=  PLnames
 
 for (y in 1:Iter)					#the entire simulation is repeated "Iter" number of times
 	{
-	Simulcore = function()
-		{     
-		for(x in seq(1,MS,1))		#the core of the simulation; each step is repeated for MS times (x=1 is the starting condition)
-			{		
-			vector1	= 1:TT
-			repeat
-				{
-				rn 		<- vector1[.Internal(sample(length(vector1), 1, replace = FALSE, prob = NULL))]		#pick a random transition
-  				index	<-.Internal(which(NINHIBIT[rn,]>=1))	#see whether there are inhibitions arcs involved in that transition (and where they are)
-  		
-  				if	 (((length(index) == 0) || (all(MM[index] < NINHIBIT[rn,index]))) && (all(MM >= -NOUT[rn,])))
-  					 {				#the real transition is completed, adding tokens to postplaces and removing them from preplaces
-  					 MM = MM + DELTA[rn,]
-  			 		break
-  			 		}					
-				else 
-					{				# the picked transition could be disabled because there is inhibition or because the tokens you have are less than those you need;
-					vector1 = vector1[!vector1 == rn]	# if that, you repeat the picking until you pick a good one!
-					if 	(length(vector1) == 0)	
-						{			# if you pick all transitions and they are all disabled, you've surely reached a dead state; therefore the whole simulation stops
-	 					.Internal(cat(list("you reached a dead state!! \n"), stdout(), " ", FALSE, NULL, FALSE))
-	 					MM[] = -1	# an absurd value (negative marking) is returned as a mark that something has gone wrong!
-	 					return(MM[])
-						}
-  					}
-				}
-			}
-		return(MM[])
-		}
-	output	= Simulcore(NIN,NOUT)
+	output	= Simulcore()
 	Globtable	= rbind(Globtable, output)
 	cat ("\n", y, "iterations of ", Iter)
 	}
@@ -127,14 +132,15 @@ for (y in 1:Iter)					#the entire simulation is repeated "Iter" number of times
 
 if (Iter > 1)
 	{
-	rownames(Globtable)  =  c(1:Iter, "Mean")
 	Mean			= colMeans(Globtable)
 	Globtable 		= rbind(Globtable, Mean)
+	rownames(Globtable)  =  c(1:Iter, "Mean")
+	}
 if	(Optim != "")
 	{cat ("\n therefore, the (mean) value of ", Optname, " is ", Globtable[nrow(Globtable), Optim], "for each iteration")}
 	
 #print the summary table and the mean value of the selected place
-write.table (Globtable, "../Materials/finalmarkings", quote = FALSE, row.names=FALSE, sep = "\t")
+write.table (Globtable, output_file, quote = FALSE, row.names=FALSE, sep = "\t")
 cat ("\n\n Success! It has been created a file containing the final values of all the places at the end of each iteration (and the mean values)")
 
 ####################################
