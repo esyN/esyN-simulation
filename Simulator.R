@@ -79,10 +79,9 @@ if (choice ==1)
 	}
 
 
-Globtable			= matrix(ncol= NP, nrow= 0)
+Globtable			= matrix(ncol= NP+1, nrow= 0)
 #Table to summarize the results of all runs and the mean value of the runs (for each place)
 
-Deadstate = rep (FALSE, Iter)
 ####################################
 ### HERE ENDS THE DECLARATION PART
 ####################################
@@ -108,13 +107,13 @@ Simulcore = function()
 				if 	(length(vector1) == 0)	
 					{			# if you pick all transitions and they are all disabled, you've surely reached a dead state; therefore the whole simulation stops
 	 				.Internal(cat(list("you reached a dead state!! \n"), stdout(), " ", FALSE, NULL, FALSE))
-					Deadstate[y] = TRUE
-		 			return(MM[])
+				
+		 			return(c(MM[],TRUE))
 					}
   				}
 			}
 		}
-	return(MM[])
+	return(c(MM[],FALSE))
 	}
 
 ####################################
@@ -133,13 +132,23 @@ if (Iter > 1)
 	{
 	Mean			= colMeans(Globtable)
 	Globtable 		= rbind(Globtable, Mean)
+  for(i in 1:nrow(Globtable)){
+    
+    if(Globtable[i,ncol(Globtable)]==1){
+      Globtable[i,ncol(Globtable)] <- "True"
+    } else {
+      Globtable[i,ncol(Globtable)] <- "False"
+    }
+    if(i == nrow(Globtable)){
+      Globtable[i,ncol(Globtable)] <- ""
+    }
+  }
 	rownames(Globtable)  =  c(1:Iter, "Mean")
 	}
 if	(Optim != "")
 	{cat ("\n therefore, the (mean) value of ", Optname, " is ", Globtable[nrow(Globtable), Optim], "for each iteration")}
 
 
-Globtable = cbind(Globtable, c(Deadstate,""))
 colnames(Globtable) = c(PLnames, "Dead State?")
 write.table (Globtable, output_file, quote = FALSE, sep = "\t")	#print the summary table and the mean value of the selected place
 cat ("\n\n Success! It has been created a file containing the final values of all the places at the end of each iteration (and the mean values)")
