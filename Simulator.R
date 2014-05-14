@@ -15,144 +15,148 @@
 
 
 ####################################
-### HERE STARTS THE DECLARATION PART
+### HERE STARTS THE INPUT PART
 ####################################
 
-#you can change the path of the input/output files by writing it in the variable "path"
-path	  = "."
-input_file  = paste (path, "/merge_matrices.txt", sep = "")
-output_file = paste (path, "/finalmarkings.txt", sep = "")
+stepsNumber	<- 100
+iterNumber	<- 100
+choicePlaceName	<- ""					# the places you're interested in; as default, all the places are considered
+inputPath	<- ""
+outputPath	<- ""
+inputFileName	<- "merge_matrices.txt"
+outputFileName	<- "finalmarkings.txt"
 
-#It gives the starting markings, the name of the places/transitions and the arc (inward, outward, inhibitory) weights to be used in the script. It uses a json file as input, but you can re-write this part to use other kinds of input 0
 
-if(!("rjson" %in% rownames(installed.packages()))) {install.packages("rjson")}	#install the package 'rjson'; it'll run it only the first time, and only if you haven't used this package yet
-library('rjson')												#every script must load the library
-json_data	<- fromJSON(paste(readLines(input_file), collapse=""))
+library('rjson')
+library('zoo')
+inputFile	<- paste (inputPath, inputFileName, sep = "")
+inputData	<- fromJSON(paste(readLines(inputFile), collapse=""))
+outputFile	<- paste (outputPath, outputFileName, sep = "")
 
-MM = MARKINGS  	<- json_data$marking 	#tokens in all the places at time 0 (i.e. the tokens you've written in the network)
-TRnames		<- json_data$tnames
-PLnames		<- json_data$pnames	#you'll need those variables later to run the simulation
+matrixTokens 	<- inputData$marking 			# tokens in all the places at time 0 (i.e. the tokens you've written in the network)
+transitNames	<- inputData$tnames
+placesNames	<- inputData$pnames			# you'll need those variables later to run the simulation
+kplaceN 	<- length(placesNames)			# Number of places
+ktransitN 	<- length(transitNames) 		# Number of Transitions
+matrixInhibit  	<- do.call(rbind, inputData$inhib)	# matrix of the weights of inhibitory arcs, always going FROM places TO transitions
+inhibIndex 	<- which(matrixInhibit>=1, arr.ind=TRUE)#see where are inhibitions in the matrix
+matrixInward 	<- do.call(rbind, inputData$post)
+matrixOutward 	<- -1*(do.call(rbind, inputData$pre))
+matrixDelta 	<- matrixInward + matrixOutward
+colnames(matrixInhibit) <- colnames(matrixInward) <- colnames(matrixOutward) <- colnames(matrixDelta) <- placesNames
 
-NP 			= length(PLnames)		# Number of places
-TT 			= length(TRnames) 	#Numb of Transitions
-MS		= 5000
-Iter		= 10
+#vectorPar 	<- inputData$tparameters	# this feature is not available at the moment; an uniform vector will be provided
+vectorPar	<- rep (1, ktransitN)
 
-NINHIBIT  		<- do.call(rbind, json_data$inhib)	#matrix of the weights of inhibitory arcs, always going FROM places TO transitions
-colnames(NINHIBIT)<- PLnames
-NIN 	 		<- do.call(rbind, json_data$post)
-colnames(NIN)	<- PLnames
-NOUT 	 		<- -1*(do.call(rbind, json_data$pre))
-colnames(NOUT) 	<- PLnames
-DELTA 		= NIN + NOUT
-colnames(DELTA)	<- PLnames
-	
+if (all(choicePlaceName == ""))
+	choicePlaceNumber <- c(1:kplaceN)
+else 	choicePlaceNumber <- which (colnames(matrixInward) == choicePlaceName)
 
-cat 	("the places in this network are: \n")
-print (PLnames)
-repeat
-	{
-	Optim	= readline ("insert the exact name of the place you're interested in, or press ENTER if you don't want to consider a particular place ")
-	if (Optim == "")	
-		{cat ("\n \t All places will be considered \n")
-		break	
-	}else if (Optim %in% PLnames)
-		{Optname	= Optim
-		Optim		= which (colnames(NIN) == Optim)	#What you're going to count at the end of the run
-		break
+
+####################################
+### HERE STARTS THE CORE PART
+####################################
+
+Simulcore <- function() {     #the core of the simulation; each step is repeated for stepsNumber times (x=1 is the starting condition)
+	matrixMatrix 	<- matrix(ncol =kplaceN+1, nrow= stepsNumber)
+	matrixMatrix[1,]<- c(matrixTokens,0)
+	totTime 	<- 0
+	matrixRow	<- 1
+
+	while (totTime < stepsNumber) {
+		vectorTrans <- 1:ktransitN				
+		tokenSum    <- rowSums(-1*sweep(matrixOutward,2,matrixTokens,`*`))
+			if (!all(tokenSum == 0))	{tokenSum[which(tokenSum == 0)] = 1}
+		vectorProb <- tokenSum*vectorPar
+		vectorProb <- (-1/vectorProb)*log(runif(ktransitN,min=0, max=1))
+
+		if (matrixRow == nrow(matrixMatrix)) {
+			addingRows   <- matrix (ncol=kplaceN+1, nrow = stepsNumber)
+			matrixMatrix <- rbind(matrixMatrix, addingRows)
 		}
-	}
-
-cat 	("\n The default values are: \n Putative Transitions \t = ", MS, "\n Iterations of the simulation = ", Iter)
-choice = readline ("\n Do you want to change these settings? press 1 for yes, anything else for no " )
-if (choice ==1)
-	{
-	repeat
-		{
-		MS	= type.convert(readline ("insert the number of putative transitions: " ), as.is = TRUE)
-			 #The number of transition you want to simulate
-		Iter = type.convert(readline ("insert the number of iterations: " ), as.is = TRUE)
-			 #The number of times you want to run the script, in order to obtain mean values of the results
-		if 	((is.numeric(MS)) && (is.numeric(Iter)))	{break
-		}else	{cat	("one or more values are not numeric, please retry \n")}
-		}
-	}
-
-
-Globtable			= matrix(ncol= NP+1, nrow= 0)
-#Table to summarize the results of all runs and the mean value of the runs (for each place)
-
-####################################
-### HERE ENDS THE DECLARATION PART
-####################################
-
-Simulcore = function()
-	{     
-	for(x in seq(1,MS,1))		#the core of the simulation; each step is repeated for MS times (x=1 is the starting condition)
-		{		
-		vector1	= 1:TT
-		repeat
-			{
-			rn 		<- vector1[.Internal(sample(length(vector1), 1, replace = FALSE, prob = NULL))]		#pick a random transition
-			index	<-.Internal(which(NINHIBIT[rn,]>=1))	#see whether there are inhibitions arcs involved in that transition (and where they are)
+		repeat {
+			parTime	<- min(vectorProb)
+			chance	<- which.min(vectorProb)
+			rn	<- vectorTrans[chance]
  			
-			if	(((length(index) == 0) || (all(MM[index] < NINHIBIT[rn,index]))) && (all(MM >= -NOUT[rn,])))
-  				{				#the real transition is completed, adding tokens to postplaces and removing them from preplaces
-  				MM = MM + DELTA[rn,]
-  			 	break
-  			 	}					
-			else 
-				{				# the picked transition could be disabled because there is inhibition or because the tokens you have are less than those you need;
-				vector1 = vector1[!vector1 == rn]	# if that, you repeat the picking until you pick a good one!
-				if 	(length(vector1) == 0)	
-					{			# if you pick all transitions and they are all disabled, you've surely reached a dead state; therefore the whole simulation stops
-	 				.Internal(cat(list("you reached a dead state!! \n"), stdout(), " ", FALSE, NULL, FALSE))
-				
-		 			return(c(MM[],TRUE))
+			if (length(inhibIndex) == 0) {
+				if (all(matrixTokens >= -matrixOutward[rn,])) {
+					#the real transition is completed, adding tokens to postplaces and removing them from preplaces
+  					matrixTokens 	<- matrixTokens + matrixDelta[rn,]
+					totTime 	<- totTime + parTime
+					matrixRow	<- matrixRow + 1		
+					matrixMatrix[matrixRow,] <- c(matrixTokens, totTime)
+	  			 	break
+				}
+			} else {
+				index <- inhibIndex[which(inhibIndex[1,] ==rn),2]	
+				#see whether and where are inhibitions arcs involved in that transition
+				if ((length(index) == 0) || (all(matrixTokens[index] < matrixInhibit[rn,index]))) {
+					if (all(matrixTokens >= -matrixOutward[rn,])) {
+						#the real transition is completed, adding tokens to postplaces and removing them from preplaces
+  						matrixTokens 	<- matrixTokens + matrixDelta[rn,]
+						totTime 	<- totTime + parTime
+						matrixRow	<- matrixRow + 1		
+						matrixMatrix[matrixRow,] <- c(matrixTokens, totTime)
+	 	 			 	break
 					}
-  				}
+				}
 			}
+
+			# the picked transition could be disabled because there is inhibition or because the tokens you have are less than those you need;
+			vectorTrans <- vectorTrans[!vectorTrans == rn]	# if that, you repeat the picking until you pick a good one!
+			vectorProb  <- vectorProb[-chance]
+			if 	(length(vectorTrans) == 0){
+				# if you pick all transitions and they are all disabled, you've surely reached a dead state; therefore the whole simulation stops
+ 				.Internal(cat(list("\t	you reached a dead state!! \t"), stdout(), " ", FALSE, NULL, FALSE))
+				matrixRow <- matrixRow + 1
+				matrixMatrix[matrixRow,] <- c(matrixTokens, Inf)
+				return(matrixMatrix[c(1:matrixRow),])
+  			}
 		}
-	return(c(MM[],FALSE))
+		
 	}
+	return(matrixMatrix[c(1:matrixRow),])
+}
+
 
 ####################################
-### HERE STARTS THE MAIN PART
+### HERE STARTS THE OUTPUT PART
 ####################################
 
-for (y in 1:Iter)					#the entire simulation is repeated "Iter" number of times
-	{
-	output	= Simulcore()
-	Globtable	= rbind(Globtable, output)
-	cat ("\n", y, "iterations of ", Iter)
-	}
+tableGlobal		<- matrix(ncol= kplaceN+1, nrow= iterNumber)	#Table to summarize the results of all runs and the mean value of the runs (for each place)
+colnames(tableGlobal)	<- c(placesNames, "Dead State?")
+totalOutput	 	<- matrix(ncol =kplaceN, nrow= stepsNumber+1)
+totalOutput[,] 		<- 0
+timeAxis 		<- zoo(0, as.numeric(c(0:stepsNumber)))
 
+for (iterCounter in 1:iterNumber) {
+	#the entire simulation is repeated "iterNumber" number of times
+	cat ("\n", iterCounter, "iterations of ", iterNumber)
+	simulcoreOutput	<- Simulcore()
 
-if (Iter > 1)
-	{
-	Mean			= colMeans(Globtable)
-	Globtable 		= rbind(Globtable, Mean)
-  for(i in 1:nrow(Globtable)){
-    
-    if(Globtable[i,ncol(Globtable)]==1){
-      Globtable[i,ncol(Globtable)] <- "True"
-    } else {
-      Globtable[i,ncol(Globtable)] <- "False"
-    }
-    if(i == nrow(Globtable)){
-      Globtable[i,ncol(Globtable)] <- ""
-    }
-  }
-	rownames(Globtable)  =  c(1:Iter, "Mean")
-	}
-if	(Optim != "")
-	{cat ("\n therefore, the (mean) value of ", Optname, " is ", Globtable[nrow(Globtable), Optim], "for each iteration")}
+	timeSeries			<- zoo(simulcoreOutput[,c(1:kplaceN)], simulcoreOutput[,(kplaceN+1)])
+	mergedSeries 			<- merge(timeSeries,timeAxis)
+	mergedSeries[,c(1:kplaceN)] 	<- na.approx(mergedSeries[,c(1:kplaceN)], rule=2)
+	timeIndex 			<- which (index(mergedSeries) %in% index(timeAxis))
+	simulcoreOutput2 		<- as.matrix(mergedSeries[timeIndex,c(1:kplaceN)])
+	totalOutput			<- totalOutput + simulcoreOutput2
 
+	if (simulcoreOutput[nrow(simulcoreOutput),kplaceN+1] == Inf)
+		tableGlobal[iterCounter,] <- c(round(simulcoreOutput2[stepsNumber + 1,],3), "YES")
+	else	tableGlobal[iterCounter,] <- c(round(simulcoreOutput2[stepsNumber + 1,],3), "NO")
+}
 
-colnames(Globtable) = c(PLnames, "Dead State?")
-write.table (Globtable, output_file, quote = FALSE, sep = "\t")	#print the summary table and the mean value of the selected place
-cat ("\n\n Success! It has been created a file containing the final values of all the places at the end of each iteration (and the mean values)")
+if (iterNumber > 1) {
+	totalOutput		<- totalOutput/iterCounter
+	tableMean		<- totalOutput[stepsNumber +1,]
+	tableGlobal 		<- rbind(tableGlobal, c(round(tableMean,3), ""))
+	rownames(tableGlobal)	<- c(1:iterNumber, "Mean")
+}
 
-####################################
-### HERE ENDS THE MAIN PART
-####################################
+write.table (tableGlobal, outputFile, quote = FALSE, sep = "\t")	#print the summary table and the mean value of the selected place
+if (choicePlaceName != "") {
+	cat  ("\n therefore, the (mean) value of ", choicePlaceName, " is ", tableGlobal[nrow(tableGlobal), choicePlaceNumber], "for each iteration")
+	plot ((0:stepsNumber), totalOutput[,choicePlaceNumber], type="l")
+} else
+	matplot ((0:stepsNumber), totalOutput, type="l")
