@@ -23,6 +23,7 @@ Input format	= json file (merge_matrices.txt) obtained from the website "http://
 		  
 How to run	= open Simulator.R
 		  optionally set the input_path and output_path (if you want to use a folder other than that containing the script)
+		  install rjson and zoo packages if you haven't done yet
 		  run the script
 		  when prompted:
 		  	- optionally set a place to monitor (by default all places are monitored)
