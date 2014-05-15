@@ -89,7 +89,7 @@ Simulcore <- function() {     #the core of the simulation; each step is repeated
 	  			 	break
 				}
 			} else {
-				index <- inhibIndex[which(inhibIndex[1,] ==rn),2]	
+				index <- inhibIndex[which(inhibIndex[,1] ==rn),2]	
 				#see whether and where are inhibitions arcs involved in that transition
 				if ((length(index) == 0) || (all(matrixTokens[index] < matrixInhibit[rn,index]))) {
 					if (all(matrixTokens >= -matrixOutward[rn,])) {
