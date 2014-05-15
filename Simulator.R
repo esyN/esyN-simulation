@@ -34,8 +34,8 @@ inputData	<- fromJSON(paste(readLines(inputFile), collapse=""))
 outputFile	<- paste (outputPath, outputFileName, sep = "")
 
 matrixTokens 	<- inputData$marking 			# tokens in all the places at time 0 (i.e. the tokens you've written in the network)
-transitNames	<- inputData$tnames
-placesNames	<- inputData$pnames			# you'll need those variables later to run the simulation
+transitNames	<- inputData$tnames			# Name of transitions
+placesNames	<- inputData$pnames			# Name of places
 kplaceN 	<- length(placesNames)			# Number of places
 ktransitN 	<- length(transitNames) 		# Number of Transitions
 matrixInhibit  	<- do.call(rbind, inputData$inhib)	# matrix of the weights of inhibitory arcs, always going FROM places TO transitions
@@ -67,8 +67,8 @@ Simulcore <- function() {     #the core of the simulation; each step is repeated
 		vectorTrans <- 1:ktransitN				
 		tokenSum    <- rowSums(-1*sweep(matrixOutward,2,matrixTokens,`*`))
 			if (!all(tokenSum == 0))	{tokenSum[which(tokenSum == 0)] = 1}
-		vectorProb <- tokenSum*vectorPar
-		vectorProb <- (-1/vectorProb)*log(runif(ktransitN,min=0, max=1))
+		vectorProb  <- tokenSum*vectorPar
+		vectorProb  <- (-1/vectorProb)*log(runif(ktransitN,min=0, max=1))
 
 		if (matrixRow == nrow(matrixMatrix)) {
 			addingRows   <- matrix (ncol=kplaceN+1, nrow = stepsNumber)
@@ -82,21 +82,20 @@ Simulcore <- function() {     #the core of the simulation; each step is repeated
 			if (length(inhibIndex) == 0) {
 				if (all(matrixTokens >= -matrixOutward[rn,])) {
 					#the real transition is completed, adding tokens to postplaces and removing them from preplaces
-  					matrixTokens 	<- matrixTokens + matrixDelta[rn,]
-					totTime 	<- totTime + parTime
-					matrixRow	<- matrixRow + 1		
+  					matrixTokens <- matrixTokens + matrixDelta[rn,]
+					totTime      <- totTime + parTime
+					matrixRow    <- matrixRow + 1		
 					matrixMatrix[matrixRow,] <- c(matrixTokens, totTime)
 	  			 	break
 				}
 			} else {
-				index <- inhibIndex[which(inhibIndex[,1] ==rn),2]	
-				#see whether and where are inhibitions arcs involved in that transition
-				if ((length(index) == 0) || (all(matrixTokens[index] < matrixInhibit[rn,index]))) {
+				indexIndex <- inhibIndex[which(inhibIndex[,1] ==rn),2]	#see whether and where are inhibitions arcs involved in that transition
+				if ((length(indexIndex) == 0) || (all(matrixTokens[indexIndex] < matrixInhibit[rn,indexIndex]))) {
 					if (all(matrixTokens >= -matrixOutward[rn,])) {
 						#the real transition is completed, adding tokens to postplaces and removing them from preplaces
-  						matrixTokens 	<- matrixTokens + matrixDelta[rn,]
-						totTime 	<- totTime + parTime
-						matrixRow	<- matrixRow + 1		
+  						matrixTokens <- matrixTokens + matrixDelta[rn,]
+						totTime	     <- totTime + parTime
+						matrixRow    <- matrixRow + 1		
 						matrixMatrix[matrixRow,] <- c(matrixTokens, totTime)
 	 	 			 	break
 					}
@@ -111,7 +110,8 @@ Simulcore <- function() {     #the core of the simulation; each step is repeated
  				.Internal(cat(list("\t	you reached a dead state!! \t"), stdout(), " ", FALSE, NULL, FALSE))
 				matrixRow <- matrixRow + 1
 				matrixMatrix[matrixRow,] <- c(matrixTokens, Inf)
-				return(matrixMatrix[c(1:matrixRow),])
+				totTime   <- stepsNumber + 1
+				break
   			}
 		}
 		
@@ -143,8 +143,8 @@ for (iterCounter in 1:iterNumber) {
 	totalOutput			<- totalOutput + simulcoreOutput2
 
 	if (simulcoreOutput[nrow(simulcoreOutput),kplaceN+1] == Inf)
-		tableGlobal[iterCounter,] <- c(round(simulcoreOutput2[stepsNumber + 1,],3), "YES")
-	else	tableGlobal[iterCounter,] <- c(round(simulcoreOutput2[stepsNumber + 1,],3), "NO")
+		tableGlobal[iterCounter,]<- c(round(simulcoreOutput2[stepsNumber + 1,],3), "YES")
+	else	tableGlobal[iterCounter,]<- c(round(simulcoreOutput2[stepsNumber + 1,],3), "NO")
 }
 
 if (iterNumber > 1) {
@@ -158,5 +158,4 @@ write.table (tableGlobal, outputFile, quote = FALSE, sep = "\t")	#print the summ
 if (choicePlaceName != "") {
 	cat  ("\n therefore, the (mean) value of ", choicePlaceName, " is ", tableGlobal[nrow(tableGlobal), choicePlaceNumber], "for each iteration")
 	plot ((0:stepsNumber), totalOutput[,choicePlaceNumber], type="l")
-} else
-	matplot ((0:stepsNumber), totalOutput, type="l")
+} else	matplot ((0:stepsNumber), totalOutput, type="l")
