@@ -48,9 +48,9 @@ colnames(matrixInhibit) <- colnames(matrixInward) <- colnames(matrixOutward) <- 
 #vectorPar 	<- inputData$tparameters	# this feature is not available at the moment; an uniform vector will be provided
 vectorPar	<- rep (1, ktransitN)
 
-if (all(choicePlaceName == ""))
+if (all(choicePlaceName == "")) {
 	choicePlaceNumber <- c(1:kplaceN)
-else 	choicePlaceNumber <- which (colnames(matrixInward) == choicePlaceName)
+} else 	choicePlaceNumber <- which (colnames(matrixInward) == choicePlaceName)
 
 
 ####################################
