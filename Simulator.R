@@ -18,26 +18,23 @@
 ### HERE STARTS THE INPUT PART
 ####################################
 
-stepsNumber	<- 100
-iterNumber	<- 100
-choicePlaceName	<- ""					# the places you're interested in; as default, all the places are considered
-inputPath	<- ""
-outputPath	<- ""
-inputFileName	<- "merge_matrices.txt"
-outputFileName	<- "finalmarkings.txt"
-
 
 library('rjson')
-library('zoo')
+stepsNumber	<- 3000       # Number of steps of each simulation (not the duration of the simulation itself)
+iterNumber	<- 100        # Number of times each simulation is repeated; all the results will be saved in separate files
+
+inputPath	    <- ""
+outputPath	  <- "Results/"
+inputFileName	<- "merge_matrices.txt"
 inputFile	<- paste (inputPath, inputFileName, sep = "")
 inputData	<- fromJSON(paste(readLines(inputFile), collapse=""))
-outputFile	<- paste (outputPath, outputFileName, sep = "")
 
 matrixTokens 	<- inputData$marking 			# tokens in all the places at time 0 (i.e. the tokens you've written in the network)
-transitNames	<- inputData$tnames			# Name of transitions
-placesNames	<- inputData$pnames			# Name of places
-kplaceN 	<- length(placesNames)			# Number of places
+transitNames	<- inputData$tnames			  # Name of transitions
+placesNames	<- inputData$pnames			    # Name of places
+kplaceN 	<- length(placesNames)		   	# Number of places
 ktransitN 	<- length(transitNames) 		# Number of Transitions
+vectorPar   <- inputData$k				      # Mass Action parameters
 matrixInhibit  	<- do.call(rbind, inputData$inhib)	# matrix of the weights of inhibitory arcs, always going FROM places TO transitions
 inhibIndex 	<- which(matrixInhibit>=1, arr.ind=TRUE)#see where are inhibitions in the matrix
 matrixInward 	<- do.call(rbind, inputData$post)
@@ -45,46 +42,37 @@ matrixOutward 	<- -1*(do.call(rbind, inputData$pre))
 matrixDelta 	<- matrixInward + matrixOutward
 colnames(matrixInhibit) <- colnames(matrixInward) <- colnames(matrixOutward) <- colnames(matrixDelta) <- placesNames
 
-#vectorPar 	<- inputData$tparameters	# this feature is not available at the moment; an uniform vector will be provided
-vectorPar	<- rep (1, ktransitN)
-
-if (all(choicePlaceName == "")) {
-	choicePlaceNumber <- c(1:kplaceN)
-} else 	choicePlaceNumber <- which (colnames(matrixInward) == choicePlaceName)
-
 
 ####################################
-### HERE STARTS THE CORE PART
+### HERE STARTS THE SIMULATION PART
 ####################################
 
-Simulcore <- function() {     #the core of the simulation; each step is repeated for stepsNumber times (x=1 is the starting condition)
+dir.create ("Results", showWarnings = FALSE)
+
+Simulcore <- function() {  #the core of the simulation; each step is repeated for stepsNumber times (x=1 is the starting condition)
 	matrixMatrix 	<- matrix(ncol =kplaceN+1, nrow= stepsNumber)
 	matrixMatrix[1,]<- c(matrixTokens,0)
 	totTime 	<- 0
-	matrixRow	<- 1
 
-	while (totTime < stepsNumber) {
+	for (matrixRow in 1:stepsNumber) {
 		vectorTrans <- 1:ktransitN				
 		tokenSum    <- rowSums(-1*sweep(matrixOutward,2,matrixTokens,`*`))
-			if (!all(tokenSum == 0))	{tokenSum[which(tokenSum == 0)] = 1}
+		tokenSum[which(tokenSum == 0)] = 1
 		vectorProb  <- tokenSum*vectorPar
 		vectorProb  <- (-1/vectorProb)*log(runif(ktransitN,min=0, max=1))
 
-		if (matrixRow == nrow(matrixMatrix)) {
-			addingRows   <- matrix (ncol=kplaceN+1, nrow = stepsNumber)
-			matrixMatrix <- rbind(matrixMatrix, addingRows)
-		}
 		repeat {
-			parTime	<- min(vectorProb)
-			chance	<- which.min(vectorProb)
-			rn	<- vectorTrans[chance]
- 			
+			parTime	<- min(vectorProb)		
+			chance	<- which(vectorProb == parTime)
+			if (length(chance) >1)
+				chance	<- sample(chance,1)
+			rn	<- vectorTrans[chance]			
+
 			if (length(inhibIndex) == 0) {
 				if (all(matrixTokens >= -matrixOutward[rn,])) {
 					#the real transition is completed, adding tokens to postplaces and removing them from preplaces
-  					matrixTokens <- matrixTokens + matrixDelta[rn,]
+  				matrixTokens <- matrixTokens + matrixDelta[rn,]
 					totTime      <- totTime + parTime
-					matrixRow    <- matrixRow + 1		
 					matrixMatrix[matrixRow,] <- c(matrixTokens, totTime)
 	  			 	break
 				}
@@ -93,9 +81,8 @@ Simulcore <- function() {     #the core of the simulation; each step is repeated
 				if ((length(indexIndex) == 0) || (all(matrixTokens[indexIndex] < matrixInhibit[rn,indexIndex]))) {
 					if (all(matrixTokens >= -matrixOutward[rn,])) {
 						#the real transition is completed, adding tokens to postplaces and removing them from preplaces
-  						matrixTokens <- matrixTokens + matrixDelta[rn,]
+  					matrixTokens <- matrixTokens + matrixDelta[rn,]
 						totTime	     <- totTime + parTime
-						matrixRow    <- matrixRow + 1		
 						matrixMatrix[matrixRow,] <- c(matrixTokens, totTime)
 	 	 			 	break
 					}
@@ -107,11 +94,9 @@ Simulcore <- function() {     #the core of the simulation; each step is repeated
 			vectorProb  <- vectorProb[-chance]
 			if 	(length(vectorTrans) == 0){
 				# if you pick all transitions and they are all disabled, you've surely reached a dead state; therefore the whole simulation stops
- 				.Internal(cat(list("\t	you reached a dead state!! \t"), stdout(), " ", FALSE, NULL, FALSE))
-				matrixRow <- matrixRow + 1
-				matrixMatrix[matrixRow,] <- c(matrixTokens, Inf)
-				totTime   <- stepsNumber + 1
-				break
+ 				.Internal(cat(list("\t	dead state!!"), stdout(), " ", FALSE, NULL, FALSE))
+				matrixMatrix[matrixRow,] <- c(matrixTokens, -totTime)
+				return(matrixMatrix[c(1:matrixRow),])
   			}
 		}
 		
@@ -119,43 +104,12 @@ Simulcore <- function() {     #the core of the simulation; each step is repeated
 	return(matrixMatrix[c(1:matrixRow),])
 }
 
-
-####################################
-### HERE STARTS THE OUTPUT PART
-####################################
-
-tableGlobal		<- matrix(ncol= kplaceN+1, nrow= iterNumber)	#Table to summarize the results of all runs and the mean value of the runs (for each place)
-colnames(tableGlobal)	<- c(placesNames, "Dead State?")
-totalOutput	 	<- matrix(ncol =kplaceN, nrow= stepsNumber+1)
-totalOutput[,] 		<- 0
-timeAxis 		<- zoo(0, as.numeric(c(0:stepsNumber)))
-
 for (iterCounter in 1:iterNumber) {
-	#the entire simulation is repeated "iterNumber" number of times
-	cat ("\n", iterCounter, "iterations of ", iterNumber)
-	simulcoreOutput	<- Simulcore()
-
-	timeSeries			<- zoo(simulcoreOutput[,c(1:kplaceN)], simulcoreOutput[,(kplaceN+1)])
-	mergedSeries 			<- merge(timeSeries,timeAxis)
-	mergedSeries[,c(1:kplaceN)] 	<- na.approx(mergedSeries[,c(1:kplaceN)], rule=2)
-	timeIndex 			<- which (index(mergedSeries) %in% index(timeAxis))
-	simulcoreOutput2 		<- as.matrix(mergedSeries[timeIndex,c(1:kplaceN)])
-	totalOutput			<- totalOutput + simulcoreOutput2
-
-	if (simulcoreOutput[nrow(simulcoreOutput),kplaceN+1] == Inf)
-		tableGlobal[iterCounter,]<- c(round(simulcoreOutput2[stepsNumber + 1,],3), "YES")
-	else	tableGlobal[iterCounter,]<- c(round(simulcoreOutput2[stepsNumber + 1,],3), "NO")
+  #the entire simulation is repeated "iterNumber" number of times
+  tempOutput	<- Simulcore()
+  outputFile3  <- paste (outputPath, "simulation", iterCounter,".txt", sep = "")
+  if (is.matrix(tempOutput)) {
+    write.table  (tempOutput, outputFile3, quote = FALSE, sep = "\t", row.names = FALSE, col.names = c(placesNames,"Time"))
+  } else {write.table  (t(tempOutput), outputFile3, quote = FALSE, sep = "\t", row.names = FALSE, col.names = c(placesNames,"Time"))}
+  cat ("\n", iterCounter, "iterations completed of ", iterNumber)
 }
-
-if (iterNumber > 1) {
-	totalOutput		<- totalOutput/iterCounter
-	tableMean		<- totalOutput[stepsNumber +1,]
-	tableGlobal 		<- rbind(tableGlobal, c(round(tableMean,3), ""))
-	rownames(tableGlobal)	<- c(1:iterNumber, "Mean")
-}
-
-write.table (tableGlobal, outputFile, quote = FALSE, sep = "\t")	#print the summary table and the mean value of the selected place
-if (choicePlaceName != "") {
-	cat  ("\n therefore, the (mean) value of ", choicePlaceName, " is ", tableGlobal[nrow(tableGlobal), choicePlaceNumber], "for each iteration")
-	plot ((0:stepsNumber), totalOutput[,choicePlaceNumber], type="l")
-} else	matplot ((0:stepsNumber), totalOutput, type="l")
