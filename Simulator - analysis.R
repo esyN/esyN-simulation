@@ -102,7 +102,7 @@ for (matCounter in valMat) {
   timeLine      <- seq(0.0, minTime, length.out = spotsN + 1)   # time line created by subsetting the selected total duration for the chose number of time points.
   timeAxis      <- zoo(0, timeLine)
   nam2          <- paste("simulcoreOutput", matCounter, sep = "")
-  assign("tempInput2",get(nam2)
+  assign("tempInput2",get(nam2))
   timeSeries	  <- zoo(tempInput2[,c(1:kplaceN)], tempInput2[,(kplaceN+1)])  #the original irregular time series is converted into a zoo object
   #aggregate(timeSeries, index(timeSeries), mean)                           # Extremely slow step; to be used only if you suspect that a transition happens so quickly that R cannot measure its duration
   

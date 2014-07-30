@@ -60,9 +60,9 @@ Simulcore <- function() {  # the core of the simulation; it is employed later in
   for (matrixRow in 1:stepsNumber) {
     # the following lines implement the core of the Gillespie algorithm;
     vectorTrans <- 1:ktransitN				                                  # a probability vector is initialized
-    tokenSum    <- rowSums(-1*sweep(matrixOutward,2,matrixTokens,`*`))  # the nr of tokens in all the input places are assigned to each transition
-    tokenSum[which(tokenSum == 0)] = 1                                  # source transitions would have 0 tokens; here, 1 token is assigned by default   
-    vectorProb  <- tokenSum*vectorPar                                   # probability vector completed
+    tokenProduct <- rowProduct(matrixTokens, matrixOutward) #the product of the number of tokens in the input places for each transition
+    tokenProduct[which(tokenProduct == 0)] = 1                                  # source transitions would have 0 tokens; here, 1 token is assigned by default   
+    vectorProb  <- tokenProduct*vectorPar                                   # probability vector completed
     vectorTime  <- 0
     for (x in 1:ktransitN) {                                            
       # random time is assigned to each transition (according an the exponential distribution with rate=probability)
@@ -125,4 +125,20 @@ for (iterCounter in 1:iterNumber) {
     write.table  (tempOutput, outputFile3, quote = FALSE, sep = "\t", row.names = FALSE, col.names = c(placesNames,"Time"))
   } else {write.table  (t(tempOutput), outputFile3, quote = FALSE, sep = "\t", row.names = FALSE, col.names = c(placesNames,"Time"))}
   cat ("\n", iterCounter, "iterations completed of ", iterNumber)
+}
+
+######## functions
+rowProduct <- function(tokens, mat){
+  #tokens is a vector of tokens, mat is the matrix describing the edges
+  out <- vector(length=dim(mat)[1])
+  for(i in 1:dim(mat)[1]){
+    tot <- 1 #init to 1 as we're doing the product not the sum
+    for(j in 1:dim(mat)[2]){
+      if(mat[i,j] != 0){
+        tot <- tot*tokens[j]
+      }
+    }
+    out[i]<-tot
+  }
+  return(out)
 }
