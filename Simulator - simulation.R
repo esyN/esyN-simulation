@@ -14,6 +14,7 @@
 ### along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
+
 ####################################
 ### HERE STARTS THE INPUT PART
 ####################################
@@ -49,6 +50,22 @@ colnames(matrixInhibit) <- colnames(matrixInward) <- colnames(matrixOutward) <- 
 ####################################
 
 dir.create ("Results", showWarnings = FALSE)
+
+######## functions
+rowProduct <- function(tokens, mat){
+  #tokens is a vector of tokens, mat is the matrix describing the edges
+  out <- vector(length=dim(mat)[1])
+  for(i in 1:dim(mat)[1]){
+    tot <- 1 #init to 1 as we're doing the product not the sum
+    for(j in 1:dim(mat)[2]){
+      if(mat[i,j] != 0){
+        tot <- tot*tokens[j]
+      }
+    }
+    out[i]<-tot
+  }
+  return(out)
+}
 
 Simulcore <- function() {  # the core of the simulation; it is employed later in the script
   # variables initialized
@@ -127,18 +144,3 @@ for (iterCounter in 1:iterNumber) {
   cat ("\n", iterCounter, "iterations completed of ", iterNumber)
 }
 
-######## functions
-rowProduct <- function(tokens, mat){
-  #tokens is a vector of tokens, mat is the matrix describing the edges
-  out <- vector(length=dim(mat)[1])
-  for(i in 1:dim(mat)[1]){
-    tot <- 1 #init to 1 as we're doing the product not the sum
-    for(j in 1:dim(mat)[2]){
-      if(mat[i,j] != 0){
-        tot <- tot*tokens[j]
-      }
-    }
-    out[i]<-tot
-  }
-  return(out)
-}
